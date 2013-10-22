@@ -1052,6 +1052,8 @@ int fghIsLegacyContextRequested( void );
 void fghContextCreationError( void );
 int fghNumberOfAuxBuffersRequested( void );
 
+#include "fg_internal_jni.h"
+
 #endif /* FREEGLUT_INTERNAL_H */
 
 /*** END OF FILE ***/
