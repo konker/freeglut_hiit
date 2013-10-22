@@ -54,6 +54,12 @@
 #    define MIN(a,b) (((a)<(b)) ? (a) : (b))
 #endif
 
+#if TARGET_HOST_ANDROID
+#include <android/log.h>
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "FreeGLUT-jnicb ****ALERT****", __VA_ARGS__))
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "FreeGLUT-jnicb ****ALERT****", __VA_ARGS__))
+#endif
+
 extern void fgProcessWork   ( SFG_Window *window );
 extern fg_time_t fgPlatformSystemTime ( void );
 extern void fgPlatformSleepForEvents( fg_time_t msec );
@@ -286,6 +292,9 @@ void fgError( const char *fmt, ... )
 #ifdef FREEGLUT_PRINT_ERRORS
         va_start( ap, fmt );
 
+#if TARGET_HOST_ANDROID
+        LOGI(fmt, ap);
+#else
         fprintf( stderr, "freeglut ");
         if( fgState.ProgramName )
             fprintf( stderr, "(%s): ", fgState.ProgramName );
@@ -293,6 +302,7 @@ void fgError( const char *fmt, ... )
         fprintf( stderr, "\n" );
 
         va_end( ap );
+#endif
 #endif
 
         if ( fgState.Initialised )
@@ -319,6 +329,9 @@ void fgWarning( const char *fmt, ... )
 #ifdef FREEGLUT_PRINT_WARNINGS
         va_start( ap, fmt );
 
+#if TARGET_HOST_ANDROID
+        LOGI(fmt, ap);
+#else
         fprintf( stderr, "freeglut ");
         if( fgState.ProgramName )
             fprintf( stderr, "(%s): ", fgState.ProgramName );
@@ -326,6 +339,7 @@ void fgWarning( const char *fmt, ... )
         fprintf( stderr, "\n" );
 
         va_end( ap );
+#endif
 #endif
     }
 }
