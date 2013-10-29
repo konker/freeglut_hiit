@@ -24,7 +24,7 @@
 
 #include <android/configuration.h>
 #include <android/looper.h>
-#include <android/native_activity.h>
+#include "native_activity.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -142,6 +142,9 @@ struct android_app {
     /* // The ALooper associated with the app's thread. */
     ALooper* looper;
 
+    /* // The ALooper for input events associated with the app's thread. */
+    ALooper* inputLooper;
+
     /* // When non-NULL, this is the input queue from which the app will */
     /* // receive user input events. */
     AInputQueue* inputQueue;
@@ -152,6 +155,9 @@ struct android_app {
     /* // Current content rectangle of the window; this is the area where the */
     /* // window's content should be placed to be seen by the user. */
     ARect contentRect;
+
+    /* The last input event received, most likely via JNI */
+    AInputEvent* inputEvent;
 
     /* // Current state of the app's activity.  May be either APP_CMD_START, */
     /* // APP_CMD_RESUME, APP_CMD_PAUSE, or APP_CMD_STOP; see below. */
@@ -170,6 +176,9 @@ struct android_app {
     int msgread;
     int msgwrite;
 
+    int inputread;
+    int inputwrite;
+
     pthread_t thread;
 
     struct android_poll_source cmdPollSource;
@@ -177,11 +186,13 @@ struct android_app {
 
     int running;
     int stateSaved;
+    int previousState;
     int destroyed;
     int redrawNeeded;
     AInputQueue* pendingInputQueue;
     ANativeWindow* pendingWindow;
     ARect pendingContentRect;
+    AInputEvent* pendingInputEvent;
 };
 
 enum {
@@ -308,7 +319,20 @@ enum {
      * Command from main thread: the app's activity is being destroyed,
      * and waiting for the app thread to clean up and exit before proceeding.
      */
-    APP_CMD_DESTROY
+    APP_CMD_DESTROY,
+
+    /* Command to complete the iniialization prcocess and call android_main,
+     * and thus the user's glut_main function.
+     */
+    APP_CMD_WIN_OK
+};
+
+enum {
+    /**
+     * Notification from the main thread that an input event should be passed to
+     * the app thread. Most likely the event has been transfered via JNI.
+     */
+    APP_INPUT_EVENT_RECEIVED
 };
 
 /**
@@ -316,6 +340,12 @@ enum {
  * app command message.
  */
 int8_t android_app_read_cmd(struct android_app* android_app);
+
+/**
+ * Call when ALooper_pollAll() returns LOOPER_ID_INPUT, reading the next
+ * input event message
+ */
+int8_t android_app_read_input(struct android_app* android_app);
 
 /**
  * Call with the command returned by android_app_read_cmd() to do the
