@@ -28,6 +28,8 @@ stamp-h1
 *~
 # my build dirs:
 cross-android
+cross-android-gles2/*
+!cross-android-gles2/rebuild.sh
 cross-woe
 native
 .svn
