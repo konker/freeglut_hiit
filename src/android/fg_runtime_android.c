@@ -151,6 +151,7 @@ void android_main(struct android_app* app) {
   extract_assets(app);
 
   /* Call user's glut_main */
+  //[XXX: why can't this be main() ?]
   {
     fgDisplay.pDisplay.app = app;
     glut_main(app);
