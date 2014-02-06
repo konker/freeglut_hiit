@@ -98,6 +98,16 @@ typedef struct ANativeActivity {
      * uses this to access binary assets bundled inside its own .apk file.
      */
     AAssetManager* assetManager;
+
+    /**
+     * Array of config properties.
+     */
+    const char** configv;
+
+    /**
+     * Size of config properties array.
+     */
+    int32_t configc;
 } ANativeActivity;
 
 /**
