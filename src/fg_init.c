@@ -107,10 +107,6 @@ extern void fgPlatformDestroyContext ( SFG_PlatformDisplay pDisplay, SFG_WindowC
 void fghParseCommandLineArguments ( int* pargc, char** argv, char **pDisplayName, char **pGeometry )
 {
 #ifndef _WIN32_WCE
-    if (!pargc) {
-        return;
-    }
-
     int i, j, argc = *pargc;
 
     {

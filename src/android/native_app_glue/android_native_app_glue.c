@@ -21,12 +21,11 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/resource.h>
+
 #include "android_native_app_glue.h"
 #include <android/log.h>
 
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "threaded_app", __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARNING, "threaded_app", __VA_ARGS__))
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUD, "threaded_app", __VA_ARGS__))
 
 static void free_saved_state(struct android_app* android_app) {
     pthread_mutex_lock(&android_app->mutex);
@@ -49,17 +48,6 @@ int8_t android_app_read_cmd(struct android_app* android_app) {
         return cmd;
     } else {
         LOGI("No data on command pipe!");
-    }
-    return -1;
-}
-
-int8_t android_app_read_input(struct android_app* android_app) {
-    int8_t inputcmd;
-    if (read(android_app->inputread, &inputcmd, sizeof(inputcmd)) == sizeof(inputcmd)) {
-        return inputcmd;
-    }
-    else {
-        LOGI("No data on input pipe!");
     }
     return -1;
 }
@@ -132,15 +120,6 @@ void android_app_pre_exec_cmd(struct android_app* android_app, int8_t cmd) {
             pthread_mutex_unlock(&android_app->mutex);
             break;
 
-        case APP_CMD_WIN_OK:
-            LOGI("APP_CMD_WIN_OK=%d\n", cmd);
-            pthread_mutex_lock(&android_app->mutex);
-            android_app->previousState = android_app->activityState;
-            android_app->activityState = cmd;
-            pthread_cond_broadcast(&android_app->cond);
-            pthread_mutex_unlock(&android_app->mutex);
-            break;
-
         case APP_CMD_CONFIG_CHANGED:
             LOGI("APP_CMD_CONFIG_CHANGED\n");
             AConfiguration_fromAssetManager(android_app->config,
@@ -175,17 +154,6 @@ void android_app_post_exec_cmd(struct android_app* android_app, int8_t cmd) {
 
         case APP_CMD_RESUME:
             free_saved_state(android_app);
-            break;
-    }
-}
-
-void android_app_pre_exec_input(struct android_app* android_app, int8_t inputcmd) {
-    switch (inputcmd) {
-        case APP_INPUT_EVENT_RECEIVED:
-            pthread_mutex_lock(&android_app->mutex);
-            android_app->inputEvent = android_app->pendingInputEvent;
-            pthread_cond_broadcast(&android_app->cond);
-            pthread_mutex_unlock(&android_app->mutex);
             break;
     }
 }
@@ -230,85 +198,6 @@ static void process_cmd(struct android_app* app, struct android_poll_source* sou
     android_app_pre_exec_cmd(app, cmd);
     if (app->onAppCmd != NULL) app->onAppCmd(app, cmd);
     android_app_post_exec_cmd(app, cmd);
-}
-
-static void process_input_jni(struct android_app* app, struct android_poll_source* source) {
-    int8_t inputcmd = android_app_read_input(app);
-    android_app_pre_exec_input(app, inputcmd);
-    if (app->onInputEvent != NULL) {
-        app->onInputEvent(app, app->inputEvent);
-    }
-}
-
-static void* android_app_entry_start(void* param) {
-    struct android_app* android_app = (struct android_app*)param;
-    ALooper* looper;
-
-    android_app->config = AConfiguration_new();
-    AConfiguration_fromAssetManager(android_app->config, android_app->activity->assetManager);
-
-    print_cur_config(android_app);
-
-    android_app->cmdPollSource.id = LOOPER_ID_MAIN;
-    android_app->cmdPollSource.app = android_app;
-    android_app->cmdPollSource.process = process_cmd;
-    android_app->inputPollSource.id = LOOPER_ID_INPUT;
-    android_app->inputPollSource.app = android_app;
-    android_app->inputPollSource.process = process_input_jni;
-
-    looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
-    ALooper_addFd(looper, android_app->msgread, LOOPER_ID_MAIN, ALOOPER_EVENT_INPUT, NULL,
-            &android_app->cmdPollSource);
-    android_app->looper = looper;
-    LOGI("Looper init OK");
-
-    looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
-    ALooper_addFd(looper, android_app->inputread, LOOPER_ID_INPUT, ALOOPER_EVENT_INPUT, NULL,
-            &android_app->inputPollSource);
-    android_app->inputLooper = looper;
-    LOGI("Inuput Looper init OK");
-
-    pthread_mutex_lock(&android_app->mutex);
-    android_app->running = 1;
-    pthread_cond_broadcast(&android_app->cond);
-    pthread_mutex_unlock(&android_app->mutex);
-
-    int ident, events;
-    struct android_poll_source* source;
-
-    /* Process looper events until reach APP_CMD_WIN_OK state */
-    while (android_app->activityState != APP_CMD_WIN_OK)
-    {
-        if ((ident=ALooper_pollOnce(0, NULL, &events, (void**)&source)) >= 0)
-        {
-            /* Process this event. */
-            if (source != NULL) {
-                source->process(source->app, source);
-            }
-        }
-    }
-
-    /* Process looper events until reach we have reverted to the previous
-       state before APP_CMD_WIN_OK was set (most likely APP_CMD_RESUME) */
-    while (android_app->activityState != android_app->previousState)
-    {
-        if ((ident=ALooper_pollOnce(0, NULL, &events, (void**)&source)) >= 0)
-        {
-            /* Process this event. */
-            if (source != NULL) {
-                source->process(source->app, source);
-            }
-        }
-    }
-
-    /* Finish off initialization by calling android_main,
-       and thus the user's glut_main funciton. */
-    android_main(android_app);
-
-    /* Once android_main is finished, clean up */
-    android_app_destroy(android_app);
-
-    return NULL;
 }
 
 static void* android_app_entry(void* param) {
@@ -374,55 +263,7 @@ static struct android_app* android_app_create(ANativeActivity* activity,
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     pthread_create(&android_app->thread, &attr, android_app_entry, android_app);
 
-    // Wait for thread to start.
-    pthread_mutex_lock(&android_app->mutex);
-    while (!android_app->running) {
-        pthread_cond_wait(&android_app->cond, &android_app->mutex);
-    }
-    pthread_mutex_unlock(&android_app->mutex);
-
-    return android_app;
-}
-
-static struct android_app* android_app_create_start(ANativeActivity* activity,
-        void* savedState, size_t savedStateSize) {
-    LOGI("android_app_create_start");
-    struct android_app* android_app = (struct android_app*)malloc(sizeof(struct android_app));
-    int msgpipe[2];
-    memset(android_app, 0, sizeof(struct android_app));
-    android_app->activity = activity;
-
-    pthread_mutex_init(&android_app->mutex, NULL);
-    pthread_cond_init(&android_app->cond, NULL);
-
-    if (savedState != NULL) {
-        LOGI("\tassigning savedState: %d", savedStateSize);
-        android_app->savedState = malloc(savedStateSize);
-        android_app->savedStateSize = savedStateSize;
-        memcpy(android_app->savedState, savedState, savedStateSize);
-    }
-    else {
-        LOGI("\tNOT assigning savedState: %d", savedStateSize);
-    }
-
-    if (pipe(msgpipe)) {
-        LOGI("could not create pipe: %s", strerror(errno));
-    }
-    android_app->msgread = msgpipe[0];
-    android_app->msgwrite = msgpipe[1];
-
-    if (pipe(msgpipe)) {
-        LOGI("could not create pipe: %s", strerror(errno));
-    }
-    android_app->inputread = msgpipe[0];
-    android_app->inputwrite = msgpipe[1];
-
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    pthread_create(&android_app->thread, &attr, android_app_entry_start, android_app);
-
-    // Wait for thread to start
+    /* // Wait for thread to start. */
     pthread_mutex_lock(&android_app->mutex);
     while (!android_app->running) {
         pthread_cond_wait(&android_app->cond, &android_app->mutex);
@@ -438,28 +279,11 @@ static struct android_app* android_app_create_start(ANativeActivity* activity,
     }
 }
 
-static void android_app_write_input(struct android_app* android_app, int8_t inputcmd) {
-    if (write(android_app->inputwrite, &inputcmd, sizeof(inputcmd)) != sizeof(inputcmd)) {
-        LOGI("Failure writing android_app input: %s\n", strerror(errno));
-    }
-}
-
 static void android_app_set_input(struct android_app* android_app, AInputQueue* inputQueue) {
     pthread_mutex_lock(&android_app->mutex);
     android_app->pendingInputQueue = inputQueue;
     android_app_write_cmd(android_app, APP_CMD_INPUT_CHANGED);
     while (android_app->inputQueue != android_app->pendingInputQueue) {
-        pthread_cond_wait(&android_app->cond, &android_app->mutex);
-    }
-    pthread_mutex_unlock(&android_app->mutex);
-}
-
-static void android_app_set_input_event(struct android_app* android_app, AInputEvent* event) {
-
-    pthread_mutex_lock(&android_app->mutex);
-    android_app->pendingInputEvent = event;
-    android_app_write_input(android_app, APP_INPUT_EVENT_RECEIVED);
-    while (android_app->inputEvent != android_app->pendingInputEvent) {
         pthread_cond_wait(&android_app->cond, &android_app->mutex);
     }
     pthread_mutex_unlock(&android_app->mutex);
@@ -499,8 +323,6 @@ static void android_app_free(struct android_app* android_app) {
 
     close(android_app->msgread);
     close(android_app->msgwrite);
-    close(android_app->inputread);
-    close(android_app->inputwrite);
     pthread_cond_destroy(&android_app->cond);
     pthread_mutex_destroy(&android_app->mutex);
     free(android_app);
@@ -593,71 +415,6 @@ static void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue* queue)
     android_app_set_input((struct android_app*)activity->instance, NULL);
 }
 
-static void onIncomingInputEvent(ANativeActivity* activity, AInputEvent* event) {
-    //LOGI("IncomingInputEvent: %p -- %p\n", (void*)activity, (void*)event);
-    android_app_set_input_event((struct android_app*)activity->instance, event);
-}
-
-/**
- * Called from Java when the activity is created to kick off
- * the native_activity_glue process. Called before the surface
- * is ready. The initialization process is then completed by
- * calling ANativeActivity_onCreatePostJniWin
- */
-void ANativeActivity_onCreatePreJniWin(ANativeActivity* activity,
-        void* savedState, size_t savedStateSize) {
-    LOGI("ANativeActivity_onCreatePreJniWin: %p\n", (void*)activity);
-    activity->callbacks->onDestroy = onDestroy;
-    activity->callbacks->onStart = onStart;
-    activity->callbacks->onResume = onResume;
-    activity->callbacks->onSaveInstanceState = onSaveInstanceState;
-    activity->callbacks->onPause = onPause;
-    activity->callbacks->onStop = onStop;
-    activity->callbacks->onConfigurationChanged = onConfigurationChanged;
-    activity->callbacks->onLowMemory = onLowMemory;
-    activity->callbacks->onWindowFocusChanged = onWindowFocusChanged;
-    activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
-    activity->callbacks->onNativeWindowDestroyed = onNativeWindowDestroyed;
-    activity->callbacks->onInputQueueCreated = onInputQueueCreated;
-    activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
-    activity->callbacks->onIncomingInputEvent = onIncomingInputEvent;
-
-    activity->instance = android_app_create_start(activity, savedState, savedStateSize);
-}
-
-
-/**
- * Called from Java when the surface is ready and a reference has
- * been passed to the native side. This then signals that the
- * initialization process should be finished.
- */
-void ANativeActivity_onCreatePostJniWin(ANativeActivity* activity) {
-    LOGI("ANativeActivity_onCreatePostJniWin");
-    struct android_app* android_app;
-    android_app = (struct android_app*)activity->instance;
-
-    // Wait for window to be set
-    pthread_mutex_lock(&android_app->mutex);
-    while (android_app->window != android_app->pendingWindow) {
-        pthread_cond_wait(&android_app->cond, &android_app->mutex);
-    }
-    pthread_mutex_unlock(&android_app->mutex);
-
-    // Signal that we are in the APP_CMD_WIN_OK state
-    android_app_write_cmd(android_app, APP_CMD_WIN_OK);
-
-    // Wait for APP_CMD_WIN_OK state to be set
-    pthread_mutex_lock(&android_app->mutex);
-    while (android_app->activityState != APP_CMD_WIN_OK) {
-        pthread_cond_wait(&android_app->cond, &android_app->mutex);
-    }
-    pthread_mutex_unlock(&android_app->mutex);
-
-    /* Revert back to previous state before APP_CMD_WIN_OK was set
-      (most likely APP_CMD_RESUME) */
-    android_app_write_cmd(android_app, android_app->previousState);
-}
-
 void ANativeActivity_onCreate(ANativeActivity* activity,
         void* savedState, size_t savedStateSize) {
     LOGI("Creating: %p\n", (void*)activity);
@@ -677,4 +434,3 @@ void ANativeActivity_onCreate(ANativeActivity* activity,
 
     activity->instance = android_app_create(activity, savedState, savedStateSize);
 }
-

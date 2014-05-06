@@ -49,7 +49,6 @@ SET(FREEGLUT_HEADERS
     include/GL/freeglut.h
     include/GL/freeglut_ext.h
     include/GL/freeglut_std.h
-    include/GL/freeglut_std_jni.h
     include/GL/glut.h
 )
 SET(FREEGLUT_SRCS
@@ -66,7 +65,6 @@ SET(FREEGLUT_SRCS
     src/fg_init.c
     src/fg_init.h
     src/fg_internal.h
-    src/fg_internal_jni.h
     src/fg_input_devices.c
     src/fg_joystick.c
     src/fg_main.c
@@ -77,12 +75,10 @@ SET(FREEGLUT_SRCS
     src/fg_stroke_mono_roman.c
     src/fg_stroke_roman.c
     src/fg_structure.c
-    src/fg_structure_jni.c
     src/fg_teapot.c
     src/fg_teapot_data.h
     src/fg_videoresize.c
     src/fg_window.c
-    src/fg_window_jni.c
 )
 # TODO: OpenGL ES requires a compatible version of these files:
 IF(NOT FREEGLUT_GLES2 AND NOT FREEGLUT_GLES1)
@@ -132,7 +128,6 @@ ELSEIF(ANDROID OR BLACKBERRY)
         src/android/fg_gamemode_android.c
         src/android/fg_joystick_android.c
         src/android/fg_spaceball_android.c
-        src/android/fg_window_android_jni.c
     )
     IF(ANDROID)
         LIST(APPEND FREEGLUT_SRCS

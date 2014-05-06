@@ -58,7 +58,7 @@
 extern int32_t handle_input(struct android_app* app, AInputEvent* event);
 extern void handle_cmd(struct android_app* app, int32_t cmd);
 
-extern int glut_main(struct android_app *app);
+extern int main(int argc, char* argv[]);
 
 /** NativeActivity Callbacks **/
 /* Caution: they are called in the native_activity thread, not the
@@ -144,17 +144,18 @@ void android_main(struct android_app* app) {
   app->activity->callbacks->onNativeWindowResized = onNativeWindowResized;
   app->activity->callbacks->onContentRectChanged = onContentRectChanged;
   app->activity->callbacks->onNativeWindowRedrawNeeded = onNativeWindowRedrawNeeded;
-
+  
   app->onAppCmd = handle_cmd;
   app->onInputEvent = handle_input;
 
   extract_assets(app);
 
-  /* Call user's glut_main */
-  //[XXX: why can't this be main() ?]
+  /* Call user's main */
   {
+    char progname[5] = "self";
+    char* argv[] = {progname, NULL};
     fgDisplay.pDisplay.app = app;
-    glut_main(app);
+    main(1, argv);
     /* FreeGLUT will exit() by itself if
        GLUT_ACTION_ON_WINDOW_CLOSE == GLUT_ACTION_EXIT */
   }
@@ -162,7 +163,7 @@ void android_main(struct android_app* app) {
   LOGI("android_main: end");
 
   /* Let NativeActivity restart us */
-  /* Users may want to forcibly exit() in their glut_main() anyway because
+  /* Users may want to forcibly exit() in their main() anyway because
      NativeActivity doesn't dlclose() us, so all statically-assigned
      variables keep their old values on restart.. */
 }
