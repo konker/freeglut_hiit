@@ -153,6 +153,9 @@ struct android_app {
     /* // window's content should be placed to be seen by the user. */
     ARect contentRect;
 
+    /* The last input event received, most likely via JNI */
+    AInputEvent* inputEvent;
+
     /* // Current state of the app's activity.  May be either APP_CMD_START, */
     /* // APP_CMD_RESUME, APP_CMD_PAUSE, or APP_CMD_STOP; see below. */
     int activityState;
@@ -170,6 +173,9 @@ struct android_app {
     int msgread;
     int msgwrite;
 
+    int inputread;
+    int inputwrite;
+
     pthread_t thread;
 
     struct android_poll_source cmdPollSource;
@@ -182,6 +188,7 @@ struct android_app {
     AInputQueue* pendingInputQueue;
     ANativeWindow* pendingWindow;
     ARect pendingContentRect;
+    AInputEvent* pendingInputEvent;
 };
 
 enum {
@@ -311,6 +318,14 @@ enum {
     APP_CMD_DESTROY
 };
 
+enum {
+    /**
+     * Notification from the main thread that an input event should be passed to
+     * the app thread. Most likely the event has been transfered via JNI.
+     */
+    APP_INPUT_EVENT_RECEIVED
+};
+
 /**
  * Call when ALooper_pollAll() returns LOOPER_ID_MAIN, reading the next
  * app command message.
@@ -343,6 +358,7 @@ void app_dummy();
 extern void android_main(struct android_app* app);
 
 /* static  */void android_app_write_cmd(struct android_app* android_app, int8_t cmd);
+/* static  */void android_app_set_input_event(struct android_app*, AInputEvent*);
 
 #ifdef __cplusplus
 }

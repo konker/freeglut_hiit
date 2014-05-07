@@ -26,6 +26,8 @@
 #include <android/log.h>
 
 #define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "threaded_app", __VA_ARGS__))
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARNING, "threaded_app", __VA_ARGS__))
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUD, "threaded_app", __VA_ARGS__))
 
 static void free_saved_state(struct android_app* android_app) {
     pthread_mutex_lock(&android_app->mutex);
@@ -50,6 +52,54 @@ int8_t android_app_read_cmd(struct android_app* android_app) {
         LOGI("No data on command pipe!");
     }
     return -1;
+}
+
+int8_t android_app_read_input(struct android_app* android_app) {
+    int8_t inputcmd;
+    if (read(android_app->inputread, &inputcmd, sizeof(inputcmd)) == sizeof(inputcmd)) {
+        return inputcmd;
+    }
+    else {
+        LOGI("No data on input pipe!");
+    }
+    return -1;
+}
+
+void android_app_pre_exec_input(struct android_app* android_app, int8_t inputcmd) {
+    switch (inputcmd) {
+        case APP_INPUT_EVENT_RECEIVED:
+            pthread_mutex_lock(&android_app->mutex);
+            android_app->inputEvent = android_app->pendingInputEvent;
+            pthread_cond_broadcast(&android_app->cond);
+            pthread_mutex_unlock(&android_app->mutex);
+            break;
+    }
+}
+
+static void process_input(struct android_app* app, struct android_poll_source* source) {
+    AInputEvent* event = NULL;
+    if (AInputQueue_getEvent(app->inputQueue, &event) >= 0) {
+        LOGI("New input event: type=%d\n", AInputEvent_getType(event));
+        if (AInputQueue_preDispatchEvent(app->inputQueue, event)) {
+            return;
+        }
+        {
+            int32_t handled = 0;
+            if (app->onInputEvent != NULL) handled = app->onInputEvent(app, event);
+            AInputQueue_finishEvent(app->inputQueue, event, handled);
+        }
+    }
+    else {
+        LOGI("Failure reading next input event: %s\n", strerror(errno));
+    }
+}
+
+static void process_input_jni(struct android_app* app, struct android_poll_source* source) {
+    int8_t inputcmd = android_app_read_input(app);
+    android_app_pre_exec_input(app, inputcmd);
+    if (app->onInputEvent != NULL) {
+        app->onInputEvent(app, app->inputEvent);
+    }
 }
 
 static void print_cur_config(struct android_app* android_app) {
@@ -84,10 +134,16 @@ void android_app_pre_exec_cmd(struct android_app* android_app, int8_t cmd) {
             pthread_mutex_lock(&android_app->mutex);
             if (android_app->inputQueue != NULL) {
                 AInputQueue_detachLooper(android_app->inputQueue);
+
+                /* switch to jni input */
+                android_app->inputPollSource.process = process_input_jni;
             }
             android_app->inputQueue = android_app->pendingInputQueue;
             if (android_app->inputQueue != NULL) {
                 LOGI("Attaching input queue to looper");
+
+                /* switch to native input */
+                android_app->inputPollSource.process = process_input;
                 AInputQueue_attachLooper(android_app->inputQueue,
                         android_app->looper, LOOPER_ID_INPUT, NULL,
                         &android_app->inputPollSource);
@@ -176,23 +232,6 @@ static void android_app_destroy(struct android_app* android_app) {
     /* // Can't touch android_app object after this. */
 }
 
-static void process_input(struct android_app* app, struct android_poll_source* source) {
-    AInputEvent* event = NULL;
-    if (AInputQueue_getEvent(app->inputQueue, &event) >= 0) {
-        LOGI("New input event: type=%d\n", AInputEvent_getType(event));
-        if (AInputQueue_preDispatchEvent(app->inputQueue, event)) {
-            return;
-        }
-        {
-	  int32_t handled = 0;
-	  if (app->onInputEvent != NULL) handled = app->onInputEvent(app, event);
-	  AInputQueue_finishEvent(app->inputQueue, event, handled);
-	}
-    } else {
-        LOGI("Failure reading next input event: %s\n", strerror(errno));
-    }
-}
-
 static void process_cmd(struct android_app* app, struct android_poll_source* source) {
     int8_t cmd = android_app_read_cmd(app);
     android_app_pre_exec_cmd(app, cmd);
@@ -212,13 +251,18 @@ static void* android_app_entry(void* param) {
     android_app->cmdPollSource.id = LOOPER_ID_MAIN;
     android_app->cmdPollSource.app = android_app;
     android_app->cmdPollSource.process = process_cmd;
+
     android_app->inputPollSource.id = LOOPER_ID_INPUT;
     android_app->inputPollSource.app = android_app;
-    android_app->inputPollSource.process = process_input;
+    android_app->inputPollSource.process = process_input_jni;
 
     looper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
-    ALooper_addFd(looper, android_app->msgread, LOOPER_ID_MAIN, ALOOPER_EVENT_INPUT, NULL,
-            &android_app->cmdPollSource);
+    ALooper_addFd(looper, android_app->msgread, LOOPER_ID_MAIN,
+                    ALOOPER_EVENT_INPUT, NULL,
+                    &android_app->cmdPollSource);
+    ALooper_addFd(looper, android_app->inputread, LOOPER_ID_INPUT,
+                    ALOOPER_EVENT_INPUT, NULL,
+                    &android_app->inputPollSource);
     android_app->looper = looper;
 
     pthread_mutex_lock(&android_app->mutex);
@@ -259,6 +303,12 @@ static struct android_app* android_app_create(ANativeActivity* activity,
     android_app->msgread = msgpipe[0];
     android_app->msgwrite = msgpipe[1];
 
+    if (pipe(msgpipe)) {
+        LOGI("could not create pipe: %s", strerror(errno));
+    }
+    android_app->inputread = msgpipe[0];
+    android_app->inputwrite = msgpipe[1];
+
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     pthread_create(&android_app->thread, &attr, android_app_entry, android_app);
@@ -279,11 +329,27 @@ static struct android_app* android_app_create(ANativeActivity* activity,
     }
 }
 
+static void android_app_write_input(struct android_app* android_app, int8_t inputcmd) {
+    if (write(android_app->inputwrite, &inputcmd, sizeof(inputcmd)) != sizeof(inputcmd)) {
+        LOGI("Failure writing android_app input: %s\n", strerror(errno));
+    }
+}
+
 static void android_app_set_input(struct android_app* android_app, AInputQueue* inputQueue) {
     pthread_mutex_lock(&android_app->mutex);
     android_app->pendingInputQueue = inputQueue;
     android_app_write_cmd(android_app, APP_CMD_INPUT_CHANGED);
     while (android_app->inputQueue != android_app->pendingInputQueue) {
+        pthread_cond_wait(&android_app->cond, &android_app->mutex);
+    }
+    pthread_mutex_unlock(&android_app->mutex);
+}
+
+/* static  */void android_app_set_input_event(struct android_app* android_app, AInputEvent* event) {
+    pthread_mutex_lock(&android_app->mutex);
+    android_app->pendingInputEvent = event;
+    android_app_write_input(android_app, APP_INPUT_EVENT_RECEIVED);
+    while (android_app->inputEvent != android_app->pendingInputEvent) {
         pthread_cond_wait(&android_app->cond, &android_app->mutex);
     }
     pthread_mutex_unlock(&android_app->mutex);
@@ -323,13 +389,15 @@ static void android_app_free(struct android_app* android_app) {
 
     close(android_app->msgread);
     close(android_app->msgwrite);
+    close(android_app->inputread);
+    close(android_app->inputwrite);
     pthread_cond_destroy(&android_app->cond);
     pthread_mutex_destroy(&android_app->mutex);
     free(android_app);
 }
 
 static void onDestroy(ANativeActivity* activity) {
-  LOGI("Destroy: %p\n", (void*)activity);
+    LOGI("Destroy: %p\n", (void*)activity);
     android_app_free((struct android_app*)activity->instance);
 }
 
