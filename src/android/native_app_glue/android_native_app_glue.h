@@ -358,7 +358,20 @@ void app_dummy();
 extern void android_main(struct android_app* app);
 
 /* static  */void android_app_write_cmd(struct android_app* android_app, int8_t cmd);
-/* static  */void android_app_set_input_event(struct android_app*, AInputEvent*);
+/*static*/ void android_app_write_input(struct android_app* android_app, int8_t inputcmd);
+/* static  */ void android_app_set_input_event(struct android_app*, AInputEvent*);
+
+#define ANDROID_APP_SET_INPUT_EVENT(android_app, event) \
+    pthread_mutex_lock(&android_app->mutex); \
+    android_app->pendingInputEvent = event; \
+    int8_t inputcmd = APP_INPUT_EVENT_RECEIVED; \
+    if (write(android_app->inputwrite, &inputcmd, sizeof(inputcmd)) != sizeof(inputcmd)) { \
+        LOGI("Failure writing android_app input: %s\n", strerror(errno)); \
+    } \
+    while (android_app->inputEvent != android_app->pendingInputEvent) { \
+        pthread_cond_wait(&android_app->cond, &android_app->mutex); \
+    } \
+    pthread_mutex_unlock(&android_app->mutex); \
 
 #ifdef __cplusplus
 }
