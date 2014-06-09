@@ -30,6 +30,8 @@ stamp-h1
 cross-android
 cross-android-gles2/*
 !cross-android-gles2/rebuild.sh
+cross-android-gles3/*
+!cross-android-gles3/rebuild.sh
 cross-woe
 native
 .svn

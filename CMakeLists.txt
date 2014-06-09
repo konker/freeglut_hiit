@@ -41,6 +41,7 @@ ENDIF()
 
 # OpenGL ES support
 OPTION(FREEGLUT_GLES "Use OpenGL ES (requires EGL)" OFF)
+OPTION(FREEGLUT_GLES3 "Use OpenGL ES 3.x (requires EGL) (overrides BUILD_GLES)" OFF)
 
 
 SET(FREEGLUT_HEADERS
@@ -79,7 +80,7 @@ SET(FREEGLUT_SRCS
     src/fg_window.c
 )
 # TODO: OpenGL ES requires a compatible version of these files:
-IF(NOT FREEGLUT_GLES)
+IF(NOT FREEGLUT_GLES3 AND NOT FREEGLUT_GLES)
     LIST(APPEND FREEGLUT_SRCS
         src/fg_font.c
         src/fg_menu.c
@@ -170,7 +171,7 @@ ELSE()
         src/x11/fg_window_x11.c
         src/x11/fg_xinput_x11.c
     )
-    IF(NOT(FREEGLUT_GLES))
+  IF(NOT(FREEGLUT_GLES3 OR FREEGLUT_GLES))
         LIST(APPEND FREEGLUT_SRCS
             src/x11/fg_internal_x11_glx.h
             src/x11/fg_display_x11_glx.c
@@ -181,7 +182,7 @@ ELSE()
         )
     ENDIF()
 ENDIF()
-IF(FREEGLUT_GLES)
+IF(FREEGLUT_GLES3 OR FREEGLUT_GLES)
     LIST(APPEND FREEGLUT_SRCS
         src/egl/fg_internal_egl.h
         src/egl/fg_display_egl.c
@@ -197,12 +198,15 @@ IF(FREEGLUT_GLES)
     )
 ENDIF()
 
-# For OpenGL ES (GLES): compile with -DFREEGLUT_GLES to cleanly
+# For OpenGL ES (GLES): compile with -DFREEGLUT_GLES and -DFREEGLUT_GLES3to cleanly
 # bootstrap headers inclusion in freeglut_std.h; this constant also
 # need to be defined in client applications (e.g. through pkg-config),
 # but do use GLES constants directly for all other needs
 # GLES1 and GLES2 libraries are compatible and can be co-linked.
-IF(FREEGLUT_GLES)
+IF(FREEGLUT_GLES3)
+  ADD_DEFINITIONS(-DFREEGLUT_GLES3)
+  LIST(APPEND LIBS GLESv3 EGL)
+ELSEIF(FREEGLUT_GLES)
   ADD_DEFINITIONS(-DFREEGLUT_GLES)
   LIST(APPEND LIBS GLESv2 GLESv1_CM EGL)
 ELSE()
@@ -363,8 +367,10 @@ ELSE()
     # - the shared library should link to the dependency libraries so that the user
     #   won't have to link them explicitly (they shouldn't have to know that we depend
     #   on Xrandr or Xxf86vm)
-    IF(FREEGLUT_GLES)
-      SET(LIBNAME freeglut_hiit-gles2)
+    IF(FREEGLUT_GLES3)
+      SET(LIBNAME freeglut_hiit-gles3)
+    ELSEIF(FREEGLUT_GLES)
+      SET(LIBNAME freeglut-gles)
     ELSE()
       SET(LIBNAME glut)
     ENDIF()
@@ -481,6 +487,18 @@ ADD_DEMO(timer           progs/demos/timer/timer.c)
 # Define static build dependencies
 IF(WIN32)
   SET(PC_LIBS_PRIVATE "-lopengl32 -lwinmm -lgdi32 -lm")
+ELSEIF(FREEGLUT_GLES3)
+  IF(ANDROID)
+    SET(PC_LIBS_PRIVATE "-llog -landroid -lGLESv3 -lEGL -lm")
+  ELSEIF(BLACKBERRY)
+    IF(PLAYBOOK)
+      SET(PC_LIBS_PRIVATE "-lbps -lscreen -lGLESv3 -lEGL -lm")
+    ELSE()
+      SET(PC_LIBS_PRIVATE "-lbps -lslog2 -lscreen -lGLESv3 -lEGL -lm")
+    ENDIF()
+  ELSE()
+    SET(PC_LIBS_PRIVATE "-lX11 -lXxf86vm -lXrandr -lGLESv3 -lEGL -lm")
+  ENDIF()
 ELSEIF(FREEGLUT_GLES)
   IF(ANDROID)
     SET(PC_LIBS_PRIVATE "-llog -landroid -lGLESv2 -lGLESv1_CM -lEGL -lm")
@@ -500,7 +518,11 @@ ENDIF()
 # bootstrap headers inclusion in freeglut_std.h:
 SET(PC_LIBNAME "glut")
 SET(PC_FILENAME "freeglut.pc")
-IF(FREEGLUT_GLES)
+IF(FREEGLUT_GLES3)
+  SET(PC_CFLAGS "-DFREEGLUT_GLES3")
+  SET(PC_LIBNAME "freeglut_hiit-gles3")
+  SET(PC_FILENAME "freeglut_hiit-gles3.pc")
+ELSEIF(FREEGLUT_GLES)
   SET(PC_CFLAGS "-DFREEGLUT_GLES")
   SET(PC_LIBNAME "freeglut-gles")
   SET(PC_FILENAME "freeglut-gles.pc")
