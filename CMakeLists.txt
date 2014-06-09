@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
-PROJECT(freeglut)
+PROJECT(freeglut-hiit)
 
 # NOTE: On Windows and Cygwin, the dll's are placed in the
 # CMAKE_RUNTIME_OUTPUT_DIRECTORY, while their corresponding import
@@ -364,7 +364,7 @@ ELSE()
     #   won't have to link them explicitly (they shouldn't have to know that we depend
     #   on Xrandr or Xxf86vm)
     IF(FREEGLUT_GLES)
-      SET(LIBNAME freeglut-gles)
+      SET(LIBNAME freeglut_hiit-gles2)
     ELSE()
       SET(LIBNAME glut)
     ENDIF()
