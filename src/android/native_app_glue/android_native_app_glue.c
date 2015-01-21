@@ -79,7 +79,7 @@ void android_app_pre_exec_input(struct android_app* android_app, int8_t inputcmd
 static void process_input(struct android_app* app, struct android_poll_source* source) {
     AInputEvent* event = NULL;
     if (AInputQueue_getEvent(app->inputQueue, &event) >= 0) {
-        LOGI("New input event: type=%d\n", AInputEvent_getType(event));
+        //LOGI("New input event: type=%d\n", AInputEvent_getType(event));
         if (AInputQueue_preDispatchEvent(app->inputQueue, event)) {
             return;
         }
@@ -96,9 +96,13 @@ static void process_input(struct android_app* app, struct android_poll_source* s
 
 static void process_input_jni(struct android_app* app, struct android_poll_source* source) {
     int8_t inputcmd = android_app_read_input(app);
+    //LOGI("process_input_jni: inputcmd: %d", inputcmd);
     android_app_pre_exec_input(app, inputcmd);
     if (app->onInputEvent != NULL) {
         app->onInputEvent(app, app->inputEvent);
+    }
+    else {
+        LOGI("Failure reading next input event: %s\n", strerror(errno));
     }
 }
 
