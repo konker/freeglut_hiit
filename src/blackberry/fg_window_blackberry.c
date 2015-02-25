@@ -31,7 +31,7 @@
 #include <GL/freeglut.h>
 #include "fg_internal.h"
 #include "egl/fg_window_egl.h"
-#include <screen/screen.h>
+#include <sys/pps.h>
 
 /*
  * Opens a window. Requires a SFG_Window object created and attached
@@ -61,7 +61,7 @@ void fgPlatformOpenWindow( SFG_Window* window, const char* title,
     int screenFormat = SCREEN_FORMAT_RGBA8888; //Only SCREEN_FORMAT_RGBA8888 and SCREEN_FORMAT_RGB565 are supported. See fg_window_egl for more info
     int configAttri;
 #define EGL_QUERY_COMP(att, comp) (eglGetConfigAttrib(fgDisplay.pDisplay.egl.Display, window->Window.pContext.egl.Config, att, &configAttri) == GL_TRUE && (configAttri comp))
-    if(EGL_QUERY_COMP(EGL_ALPHA_SIZE, <= 0) && EGL_QUERY_COMP(EGL_RED_SIZE, <= 5) &&
+    if (EGL_QUERY_COMP(EGL_ALPHA_SIZE, <= 0) && EGL_QUERY_COMP(EGL_RED_SIZE, <= 5) &&
             EGL_QUERY_COMP(EGL_GREEN_SIZE, <= 6) && EGL_QUERY_COMP(EGL_BLUE_SIZE, <= 5)) {
         screenFormat = SCREEN_FORMAT_RGB565;
     }
@@ -69,11 +69,17 @@ void fgPlatformOpenWindow( SFG_Window* window, const char* title,
 
     /* Set window properties */
     int orientation = atoi(getenv("ORIENTATION"));
-#ifdef GL_ES_VERSION_2_0
-    int screenUsage = SCREEN_USAGE_OPENGL_ES2 | SCREEN_USAGE_ROTATION;
-#elif GL_VERSION_ES_CM_1_0 || GL_VERSION_ES_CL_1_0 || GL_VERSION_ES_CM_1_1 || GL_VERSION_ES_CL_1_1
-    int screenUsage = SCREEN_USAGE_OPENGL_ES1 | SCREEN_USAGE_ROTATION;
+    int screenUsage = SCREEN_USAGE_ROTATION;
+#ifdef SCREEN_USAGE_OPENGL_ES3
+    if (fgState.MajorVersion >= 3) {
+        screenUsage |= SCREEN_USAGE_OPENGL_ES3;
+    } else
 #endif
+    if (fgState.MajorVersion >= 2) {
+        screenUsage |= SCREEN_USAGE_OPENGL_ES2;
+    } else {
+        screenUsage |= SCREEN_USAGE_OPENGL_ES1;
+    }
 #if !defined(__X86__) && !defined(__PLAYBOOK__)
     screenUsage |= SCREEN_USAGE_DISPLAY; // Physical device copy directly into physical display
 #endif
@@ -255,9 +261,20 @@ void fgPlatformHideWindow( SFG_Window *window )
  */
 void fgPlatformIconifyWindow( SFG_Window *window )
 {
-    //XXX This is possible via Cascades, but can't seem to find a C-level API
-    //XXX bb::Application::instance()->minimize();
+#ifndef __PLAYBOOK__
+    pps_encoder_t encoder;
+
+    pps_encoder_initialize(&encoder, false);
+    pps_encoder_add_string(&encoder, "msg", "minimizeWindow");
+
+    if (navigator_raw_write(pps_encoder_buffer(&encoder), pps_encoder_length(&encoder)) != BPS_SUCCESS) {
+        fgWarning("Could not iconify window on BlackBerry");
+    }
+
+    pps_encoder_cleanup(&encoder);
+#else
     fprintf(stderr, "fgPlatformGlutIconifyWindow: STUB\n");
+#endif
 }
 
 /*
@@ -273,6 +290,7 @@ void fgPlatformGlutSetWindowTitle( const char* title )
  */
 void fgPlatformGlutSetIconTitle( const char* title )
 {
+    //XXX Possibly a window cover label?
     fprintf(stderr, "fgPlatformGlutSetIconTitle: STUB\n");
 }
 

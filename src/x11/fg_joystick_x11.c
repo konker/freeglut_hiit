@@ -1,5 +1,5 @@
 /*
- * freeglut_joystick_x11.c
+ * fg_joystick_x11.c
  *
  * Joystick handling code
  *
@@ -38,6 +38,8 @@
 #ifdef HAVE_SYS_PARAM_H
 #    include <sys/param.h>
 #endif
+
+#include <fcntl.h>
 
 
 /*this should be defined in a header file */
@@ -115,11 +117,7 @@ void fgPlatformJoystickRawRead( SFG_Joystick* joy, int* buttons, float* axes )
             }
         }
     }
-#    ifdef HAVE_ERRNO_H
     if ( len < 0 && errno != EAGAIN )
-#    else
-    if ( len < 0 )
-#    endif
     {
         perror( joy->pJoystick.os->fname );
         joy->error = 1;
@@ -138,7 +136,6 @@ void fgPlatformJoystickRawRead( SFG_Joystick* joy, int* buttons, float* axes )
 
         if ( status != sizeof( struct js_event ) )
         {
-#  ifdef HAVE_ERRNO_H
             if ( errno == EAGAIN )
             {
                 /* Use the old values */
@@ -149,7 +146,6 @@ void fgPlatformJoystickRawRead( SFG_Joystick* joy, int* buttons, float* axes )
                             sizeof( float ) * joy->num_axes );
                 return;
             }
-#  endif
 
             fgWarning ( "%s", joy->pJoystick.fname );
             joy->error = GL_TRUE;
@@ -241,10 +237,8 @@ void fgPlatformJoystickOpen( SFG_Joystick* joy )
 
     joy->pJoystick.os->fd = open( joy->pJoystick.os->fname, O_RDONLY | O_NONBLOCK);
 
-#ifdef HAVE_ERRNO_H
     if( joy->pJoystick.os->fd < 0 && errno == EACCES )
         fgWarning ( "%s exists but is not readable by you", joy->pJoystick.os->fname );
-#endif
 
     joy->error =( joy->pJoystick.os->fd < 0 );
 

@@ -44,6 +44,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 #include "glmatrix.h"
 
@@ -285,6 +286,7 @@ GLint getAttribOrUniformLocation(const char* name, GLuint program, GLboolean isA
             fprintf(stderr, "Warning: Could not bind attrib %s\n", name);  
         }
 
+		checkError ("getAttribOrUniformLocation");
         return attrib;
     }
     else
@@ -295,9 +297,9 @@ GLint getAttribOrUniformLocation(const char* name, GLuint program, GLboolean isA
             fprintf(stderr, "Warning: Could not bind uniform %s\n", name);  
         }
 
+		checkError ("getAttribOrUniformLocation");
         return uniform;
     }
-    checkError ("getAttribOrUniformLocation");
 }
 
 GLuint program;

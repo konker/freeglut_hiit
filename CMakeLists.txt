@@ -1,5 +1,8 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.8 FATAL_ERROR)
 PROJECT(freeglut-hiit)
+
+# for multiarch LIBDIR support (requires cmake>=2.8.8)
+INCLUDE(GNUInstallDirs)
 
 # NOTE: On Windows and Cygwin, the dll's are placed in the
 # CMAKE_RUNTIME_OUTPUT_DIRECTORY, while their corresponding import
@@ -18,6 +21,13 @@ set(VERSION_MAJOR 3)
 set(VERSION_MINOR 0)
 set(VERSION_PATCH 0)
 
+# Update fg_version.h to match the versions number here in cmake
+CONFIGURE_FILE(src/fg_version.h.in src/fg_version.h)
+
+# shared lib version numbers (change before release)
+set(SO_MAJOR 3)		# increment on backwards incompatible API/ABI changes
+set(SO_MINOR 10)	# increment on backwards compatible or internal changes
+set(SO_REV 0)		# if nothing else changed increment this
 
 # FREEGLUT_BUILD_SHARED_LIBS is already a standard CMake variable, but we need to
 # re-declare it here so it will show up in the GUI.
@@ -42,6 +52,11 @@ ENDIF()
 # OpenGL ES support
 OPTION(FREEGLUT_GLES "Use OpenGL ES (requires EGL)" OFF)
 OPTION(FREEGLUT_GLES3 "Use OpenGL ES 3.x (requires EGL) (overrides BUILD_GLES)" OFF)
+
+# option to build either as "glut" (ON) or "freeglut" (OFF)
+IF(NOT WIN32)
+    OPTION(FREEGLUT_REPLACE_GLUT "Be a replacement for GLUT" ON)
+ENDIF()
 
 
 SET(FREEGLUT_HEADERS
@@ -230,6 +245,9 @@ IF(WIN32)
         SET( CMAKE_DEBUG_POSTFIX "d" )
     ENDIF(MSVC)
     
+    # enable the use of Win2000 APIs (needed for really old compilers like MSVC6)
+    ADD_DEFINITIONS(-D_WIN32_WINNT=0x0500)
+    ADD_DEFINITIONS(-DWINVER=0x0500)
 ENDIF()
 
 IF(CMAKE_COMPILER_IS_GNUCC)
@@ -243,6 +261,7 @@ ENDIF(CMAKE_COMPILER_IS_GNUCC)
 INCLUDE(CheckIncludeFiles)
 IF(UNIX AND NOT(ANDROID OR BLACKBERRY))
     FIND_PACKAGE(X11 REQUIRED)
+    INCLUDE_DIRECTORIES(${X11_INCLUDE_DIR})
     LIST(APPEND LIBS ${X11_LIBRARIES})
     IF(X11_Xrandr_FOUND)
         SET(HAVE_X11_EXTENSIONS_XRANDR_H TRUE)
@@ -250,10 +269,6 @@ IF(UNIX AND NOT(ANDROID OR BLACKBERRY))
     ENDIF()
     IF(X11_xf86vmode_FOUND)
         SET(HAVE_X11_EXTENSIONS_XF86VMODE_H TRUE)
-        # Work-around http://www.cmake.org/Bug/bug_view_page.php?bug_id=6976
-        IF(NOT "${X11_Xxf86vm_LIB}")
-            SET(X11_Xxf86vm_LIB "Xxf86vm")
-        ENDIF()
         LIST(APPEND LIBS ${X11_Xxf86vm_LIB})
     ENDIF()
     IF(X11_Xinput_FOUND)
@@ -267,15 +282,14 @@ IF(ANDROID)
     # -llog for native Android logging
     LIST(APPEND LIBS android log)
 ELSEIF(BLACKBERRY)
-    if(PLAYBOOK)
-        # -lbps for event loop
-        # -screen for native screen
-        LIST(APPEND LIBS bps screen)
-    ELSE()
-        # -lbps for event loop
+    # -lbps for event loop
+    # -screen for native screen
+    LIST(APPEND LIBS bps screen)
+
+    if(NOT PLAYBOOK)
         # -lslog2 for logging
-        # -screen for native screen
-        LIST(APPEND LIBS bps slog2 screen)
+        # -pps for low-level screen manipulation
+        LIST(APPEND LIBS slog2 pps)
     ENDIF()
 ENDIF()
 
@@ -288,11 +302,8 @@ CHECK_INCLUDE_FILES(stdbool.h 	HAVE_STDBOOL_H)
 CHECK_INCLUDE_FILES(sys/param.h HAVE_SYS_PARAM_H)
 CHECK_INCLUDE_FILES(sys/ioctl.h HAVE_SYS_IOCTL_H)
 CHECK_INCLUDE_FILES(fcntl.h 	HAVE_FCNTL_H)
-CHECK_INCLUDE_FILES(errno.h 	HAVE_ERRNO_H)
 CHECK_INCLUDE_FILES(usbhid.h 	HAVE_USBHID_H)
 CHECK_FUNCTION_EXISTS(gettimeofday HAVE_GETTIMEOFDAY)
-CHECK_FUNCTION_EXISTS(vfprintf  HAVE_VFPRINTF)
-CHECK_FUNCTION_EXISTS(_doprnt   HAVE_DOPRNT)
 CHECK_FUNCTION_EXISTS(XParseGeometry   HAVE_XPARSEGEOMETRY)
 IF (NOT HAVE_XPARSEGEOMETRY)
    LIST(APPEND FREEGLUT_SRCS
@@ -318,7 +329,7 @@ ENDIF()
 # ensure that all CMake-generated files are kept away from the main source tree.
 # As a result, the build directory must to be added to the include path list.
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_BINARY_DIR}/config.h)
-INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
+INCLUDE_DIRECTORIES(BEFORE ${CMAKE_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
 ADD_DEFINITIONS(-DHAVE_CONFIG_H)
 IF(WIN32)
     # we also have to generate freeglut.rc, which contains the version
@@ -363,20 +374,25 @@ ELSE()
     #   or special-cased FreeGLUT long ago (e.g. .so.4 on OpenBSD), so
     #   the lack of support for current:revision:age in CMake should
     #   not be a problem.
-    # - the output library should be named glut so it'll be linkable with -lglut
+	# - the output library should be named glut so it'll be linkable with -lglut
+	#   (unless FREEGLUT_REPLACE_GLUT is false).
     # - the shared library should link to the dependency libraries so that the user
     #   won't have to link them explicitly (they shouldn't have to know that we depend
     #   on Xrandr or Xxf86vm)
     IF(FREEGLUT_GLES3)
       SET(LIBNAME freeglut_hiit-gles3)
     ELSEIF(FREEGLUT_GLES)
-      SET(LIBNAME freeglut-gles)
+		SET(LIBNAME freeglut-gles)
     ELSE()
-      SET(LIBNAME glut)
-    ENDIF()
+		IF(FREEGLUT_REPLACE_GLUT)
+			SET(LIBNAME glut)
+		ELSE()
+			SET(LIBNAME freeglut)
+		ENDIF()
+	ENDIF()
 
     IF(FREEGLUT_BUILD_SHARED_LIBS)
-      SET_TARGET_PROPERTIES(freeglut PROPERTIES VERSION 3.9.0 SOVERSION 3 OUTPUT_NAME ${LIBNAME})
+      SET_TARGET_PROPERTIES(freeglut PROPERTIES VERSION ${SO_MAJOR}.${SO_MINOR}.${SO_REV} SOVERSION ${SO_MAJOR} OUTPUT_NAME ${LIBNAME})
     ENDIF()
     IF(FREEGLUT_BUILD_STATIC_LIBS)
       SET_TARGET_PROPERTIES(freeglut_static PROPERTIES OUTPUT_NAME ${LIBNAME})
@@ -403,8 +419,8 @@ ENDIF()
 IF(FREEGLUT_BUILD_SHARED_LIBS)
     INSTALL(TARGETS freeglut
             RUNTIME DESTINATION bin
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
     IF(INSTALL_PDB)
         INSTALL(FILES ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Debug/freeglut${CMAKE_DEBUG_POSTFIX}.pdb
@@ -415,8 +431,8 @@ ENDIF()
 IF(FREEGLUT_BUILD_STATIC_LIBS)
     INSTALL(TARGETS freeglut_static
             RUNTIME DESTINATION bin
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
     IF(INSTALL_PDB)
         INSTALL(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/Debug/freeglut_static${CMAKE_DEBUG_POSTFIX}.pdb
@@ -528,6 +544,6 @@ ELSEIF(FREEGLUT_GLES)
   SET(PC_FILENAME "freeglut-gles.pc")
 ENDIF()
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/freeglut.pc.in ${CMAKE_BINARY_DIR}/freeglut.pc @ONLY)
-INSTALL(FILES ${CMAKE_BINARY_DIR}/freeglut.pc DESTINATION share/pkgconfig/ RENAME ${PC_FILENAME})
+INSTALL(FILES ${CMAKE_BINARY_DIR}/freeglut.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig/ RENAME ${PC_FILENAME})
 # TODO: change the library and .pc name when building for GLES,
 # e.g. -lglut-GLES

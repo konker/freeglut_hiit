@@ -1,5 +1,5 @@
 /*
- * freeglut_state_mswin.c
+ * fg_state_mswin.c
  *
  * The Windows-specific state query methods.
  *
@@ -256,7 +256,7 @@ int fgPlatformGlutGet ( GLenum eWhat )
              * all other extra pixels are assumed to be atop the window, forming the caption.
              */
             borderWidth   = ((winRect.right-winRect.left)-(clientRect.right-clientRect.left))/2;
-            captionHeight = (winRect.bottom-winRect.top)-(clientRect.bottom-clientRect.top)-borderWidth*2;
+            captionHeight = (winRect.bottom-winRect.top)-(clientRect.bottom-clientRect.top)-borderWidth; /* include top border in caption height */
             
             switch( eWhat )
             {
@@ -327,11 +327,9 @@ int fgPlatformGlutDeviceGet ( GLenum eWhat )
 
     default:
         fgWarning( "glutDeviceGet(): missing enum handle %d", eWhat );
+        return -1;
         break;
     }
-
-    /* And now -- the failure. */
-    return -1;
 }
 
 /*

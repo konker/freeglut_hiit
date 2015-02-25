@@ -1,5 +1,5 @@
 /*
- * freeglut_state.c
+ * fg_state.c
  *
  * Freeglut state query methods.
  *
@@ -110,12 +110,16 @@ void FGAPIENTRY glutSetOption( GLenum eWhat, int value )
       break;
 
     case GLUT_SKIP_STALE_MOTION_EVENTS:
-      fgState.SkipStaleMotion = value;
+      fgState.SkipStaleMotion = !!value;
       break;
 
     case GLUT_GEOMETRY_VISUALIZE_NORMALS:
       if( fgStructure.CurrentWindow != NULL )
-        fgStructure.CurrentWindow->State.VisualizeNormals = value;
+        fgStructure.CurrentWindow->State.VisualizeNormals = !!value;
+      break;
+
+    case GLUT_STROKE_FONT_DRAW_JOIN_DOTS:
+      fgState.StrokeFontDrawJoinDots = !!value;
       break;
 
     default:
@@ -218,11 +222,13 @@ int FGAPIENTRY glutGet( GLenum eWhat )
         return GL_FALSE;
       return fgStructure.CurrentWindow->State.VisualizeNormals;
 
+    case GLUT_STROKE_FONT_DRAW_JOIN_DOTS:
+        return fgState.StrokeFontDrawJoinDots;
+
     default:
         return fgPlatformGlutGet ( eWhat );
         break;
     }
-    return -1;
 }
 
 /*
@@ -282,9 +288,6 @@ int FGAPIENTRY glutDeviceGet( GLenum eWhat )
     default:
 		return fgPlatformGlutDeviceGet ( eWhat );
     }
-
-    /* And now -- the failure. */
-    return -1;
 }
 
 /*

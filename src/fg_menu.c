@@ -1,5 +1,5 @@
 /*
- * freeglut_menu.c
+ * fg_menu.c
  *
  * Pull-down menu creation and handling.
  *
@@ -65,7 +65,7 @@
  * These variables are for rendering the freeglut menu items.
  *
  * The choices are fore- and background, with and without h for Highlighting.
- * Old GLUT appeared to be system-dependant for its colors (sigh) so we are
+ * Old GLUT appeared to be system-dependent for its colors (sigh) so we are
  * too.  These variables should be stuffed into global state and initialized
  * via the glutInit*() system.
  */
@@ -782,7 +782,7 @@ void fghCalculateMenuBoxSize( void )
  */
 int FGAPIENTRY glutCreateMenu( FGCBMenu callback )
 {
-    /* The menu object creation code resides in freeglut_structure.c */
+    /* The menu object creation code resides in fg_structure.c */
     FREEGLUT_EXIT_IF_NOT_INITIALISED ( "glutCreateMenu" );
     if (fgState.ActiveMenus)
         fgError("Menu manipulation not allowed while menus in use.");
@@ -804,7 +804,7 @@ void FGAPIENTRY glutDestroyMenu( int menuID )
     if (fgState.ActiveMenus)
         fgError("Menu manipulation not allowed while menus in use.");
 
-    /* The menu object destruction code resides in freeglut_structure.c */
+    /* The menu object destruction code resides in fg_structure.c */
     fgDestroyMenu( menu );
 }
 

@@ -1,5 +1,5 @@
 /*
- * freeglut_internal_x11.h
+ * fg_internal_x11.h
  *
  * The freeglut library private include file.
  *
@@ -49,7 +49,7 @@
 
 
 /* -- GLOBAL TYPE DEFINITIONS ---------------------------------------------- */
-/* The structure used by display initialization in freeglut_init.c */
+/* The structure used by display initialization in fg_init.c */
 typedef struct tagSFG_PlatformDisplay SFG_PlatformDisplay;
 struct tagSFG_PlatformDisplay
 {
@@ -122,7 +122,7 @@ struct tagSFG_PlatformWindowState
 
 /* -- JOYSTICK-SPECIFIC STRUCTURES AND TYPES ------------------------------- */
 /*
- * Initial defines from "js.h" starting around line 33 with the existing "freeglut_joystick.c"
+ * Initial defines from "js.h" starting around line 33 with the existing "fg_joystick.c"
  * interspersed
  */
 #    ifdef HAVE_SYS_IOCTL_H
@@ -131,10 +131,10 @@ struct tagSFG_PlatformWindowState
 #    ifdef HAVE_FCNTL_H
 #        include <fcntl.h>
 #    endif
-#    ifdef HAVE_ERRNO_H
-#        include <errno.h>
-#        include <string.h>
-#    endif
+
+#include <errno.h>
+#include <string.h>
+
 #    if defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__)
 /* XXX The below hack is done until freeglut's autoconf is updated. */
 #        define HAVE_USB_JS    1
@@ -220,12 +220,12 @@ struct tagSFG_PlatformJoystick
 
 
 /* -- PRIVATE FUNCTION DECLARATIONS ---------------------------------------- */
-/* spaceball device functions, defined in freeglut_spaceball.c */
+/* spaceball device functions, defined in fg_spaceball.c */
 int             fgIsSpaceballXEvent( const XEvent *ev );
 void            fgSpaceballHandleXEvent( const XEvent *ev );
 
 /*
- * Check if "hint" is present in "property" for "window".  See freeglut_init.c
+ * Check if "hint" is present in "property" for "window".  See fg_init.c
  */
 int             fgHintPresent(Window window, Atom property, Atom hint);
 

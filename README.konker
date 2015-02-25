@@ -1,0 +1,96 @@
+NOTES (konker@luxvelocitas.com)
+==============================================================================
+
+- One problem is that "activity" and "app" are tied together and have the same lifecycle
+    - we desire to have those separated:
+        - app has the lifecycle of the Application object
+        - activity has the lifecycle of the Activity object
+
+    - Could we move android_app  initialization into NativeApplication?
+    - Keep ANativeActivity initialization in NativeActivity
+
+
+
+## Currently:
+
+- onCreate{J}
+    - _createNativeEnvironmentPre()
+        - [malloc ANativeActivity]
+        - ANativeActivity_onCreatePreJniWin(ANativeActivity*, ...) #JNI
+            - [set activity callbacks]
+            - android_app_create_start(ANativeActivity*, ...)
+                - [malloc android_app]
+                - [android_app->activity = activity]
+                - [create thread msg pipes]
+                - [create thread input pipes]
+                - pthread_create(..., android_app_entry_start, android_app) #TH
+                    |
+                    ----THREAD----->  (See android_app_entry_start)
+
+- onSurfaceChanged{J}
+    - onSurfaceChangedNative(ANativeActivity*, surface, ...)
+        - [gNativeWindow = ANativeWindow_fromSurface(..., surface)]
+        - [destroy old native window]
+        - activity->callbacks->onNativeWindowCreated(ANativeActivity*, ANativeWindow*)
+            - android_app_set_window(struct android_app*, ANativeWindow*)
+                - [change android_app->window reference on the native app thread] // (XX1) #TH
+    - loadNativeCodePost(ANativeActivity*, ...)
+        - ANativeActivity_onCreatePostJniWin(ANativeActivity*) #JNI
+            - [wait for window reference to be set] // Set: XX1
+            - [android_app_write_cmd(struct android_app*, APP_CMD_WIN_OK) // (XX2) #TH
+            - [android_app_write_cmd(struct android_app*, APP_CMD_RESUME) // (XX3) #TH
+        - [NativeController.notify(EventType_onCreate]
+
+
+- android_app_entry_start()
+    - [create AConfiguration]
+    - [cmdPollSource.process = process_cmd]
+    - [inputPollSource.process = process_input_jni] #JNI
+    - [prepare cmd Looper]
+    - [prepare input Looper]
+    - [android_app->running = 1]
+    - [process looper events until reach APP_CMD_WIN_OK]  // SEE: XX2 #TH
+    - [process looper events utile reach APP_CMD_RESUME]  // SEE: XX3 #TH
+    - android_main(struct android_app*)
+        - [set activity callbacks: onNativeWindowResized, onContentRectChanged, onNativeWindowRedrawNeeded]
+        - [app->onAppCmd = handle_cmd]
+        - [app->onInputEvent = handle_input]
+        - glut_main(struct android_app*)
+                |
+                --- USER CODE --> (see glut_main)
+    - android_app_destroy(struct android_app*)
+
+
+- glut_main(struct android_app*)
+    - glutInit()
+    - glutInitDisplayMode()
+    - glutSetOption()
+    - init_context()
+        - glutCreateWindowJni(..., android_app->window) #JNI
+            - fgCreateWindowJni(..., ANativeWindow*, ...) #JNI
+                - fgPlatformCreateWindow(SFG_Window*)
+                    - fghPlatformCreateWindowEGL(SFG_Window*)
+                        - [pContext.egl.Surface = EGL_NO_SURFACE]
+                        - [pContext.egl.Config = NULL]
+                - fgOpenWindowJni(SFG_Window*, ANativeWindow*, ...) #JNI
+                    - fgPlatformOpenWindowJni(SFG_Window*, ANativeWindow*, ...) #JNI
+                        - [window->Window.Handle = jniwin] #JNI
+                        - [window->State.WorkMask |= GLUT_INIT_WORK]
+                        - fghChooseConfig(...)
+                        - fghCreateNewContextEGL(SFG_Window*)
+                            - eglCreateContext(...)  // <------------------ !! CONTEXT created
+                        - fghPlatformOpenWindowEGL(SFG_Window*)
+                            - eglCreateWindowSurface(...)
+                            - fgPlatformSetWindow(SFG_Window*)
+                                - eglMakeCurrent(...)
+                        - [window->State.Visible = GL_TRUE]
+    - glutDisplayFunc()
+    - glutMouseFunc()
+    - glutMainLoop()    // <---- Loops until end of activity => app is also destroyed
+
+
+
+
+
+
+

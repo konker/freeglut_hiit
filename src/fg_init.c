@@ -1,5 +1,5 @@
 /*
- * freeglut_init.c
+ * fg_init.c
  *
  * Various freeglut initialization functions.
  *
@@ -87,6 +87,7 @@ SFG_State fgState = { { -1, -1, GL_FALSE },  /* Position */
                       1,                      /* AuxiliaryBufferNumber */
                       4,                      /* SampleNumber */
                       GL_FALSE,               /* SkipStaleMotion */
+                      GL_FALSE,               /* StrokeFontDrawJoinDots */
                       1,                      /* OpenGL context MajorVersion */
                       0,                      /* OpenGL context MinorVersion */
                       0,                      /* OpenGL ContextFlags */

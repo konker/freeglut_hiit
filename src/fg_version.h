@@ -1,11 +1,11 @@
 /*
- * fg_spaceball_mswin.c
+ * fg_version.h
  *
- * Spaceball support for Windows
+ * The freeglut library private include file.
  *
- * Copyright (c) 2012 Stephen J. Baker. All Rights Reserved.
- * Written by Evan Felix <karcaw at gmail.com>
- * Creation date: Sat Feb 4, 2012
+ * Copyright (c) 1999-2000 Pawel W. Olszta. All Rights Reserved.
+ * Written by Pawel W. Olszta, <olszta@sourceforge.net>
+ * Creation date: Thu Dec 2 1999
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,35 +24,24 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-/*
- * This code is a very complicated way of doing nothing.  
- * But is needed for mswindows platform builds.
+
+#ifndef  FREEGLUT_VERSION_H
+#define  FREEGLUT_VERSION_H
+
+/* Ordinarily it's cmake's job to update fg_version.h,
+ * edit CMakeLists.txt rather than this file directly.
  */
 
-#include <GL/freeglut.h>
-#include "../fg_internal.h"
+#ifndef VERSION_MAJOR
+#define VERSION_MAJOR 3
+#endif
 
-void fgPlatformInitializeSpaceball(void)
-{
-	return;
-}
+#ifndef VERSION_MINOR
+#define VERSION_MINOR 0
+#endif
 
-void fgPlatformSpaceballClose(void)
-{
-	return;
-}
+#ifndef VERSION_PATCH
+#define VERSION_PATCH 0
+#endif
 
-int fgPlatformHasSpaceball(void)
-{
-	return 0;
-}
-
-int fgPlatformSpaceballNumButtons(void)
-{
-	return 0;
-}
-
-void fgPlatformSpaceballSetWindow(SFG_Window *window)
-{
-	return;
-}
+#endif

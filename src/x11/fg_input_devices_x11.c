@@ -1,5 +1,5 @@
 /*
- * freeglut_input_devices_x11.c
+ * fg_input_devices_x11.c
  *
  * Handles miscellaneous input devices via direct serial-port access.
  * Proper X11 XInput device support is not yet supported.
@@ -30,16 +30,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifdef HAVE_CONFIG_H
-#    include "config.h"
-#endif
-
 #include <GL/freeglut.h>
 #include "../fg_internal.h"
 
-#ifdef HAVE_ERRNO_H
 #include <errno.h>
-#endif
 #include <sys/ioctl.h>
 #include <stdio.h>
 #include <stdlib.h>
