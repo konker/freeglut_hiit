@@ -3,7 +3,7 @@
 # cd to here
 cd "$(dirname "$0")"
 
-export PREFERRED_STANDALONE=~/SDK/ndk-standalone-19
+export PREFERRED_STANDALONE=~/SDK/ndk-standalone-19-tadp
 
 PATH=$PREFERRED_STANDALONE/bin:$PATH
 
