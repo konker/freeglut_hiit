@@ -31,8 +31,8 @@
 #include "egl/fg_window_egl.h"
 
 #include <android/log.h>
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "FreeGLUT", __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "FreeGLUT", __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "WOMBATT", __VA_ARGS__), __android_log_print(ANDROID_LOG_INFO, "WOMBATT", "\tgettid: %d", gettid()) )
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "WOMBATT", __VA_ARGS__))
 #include <android/native_app_glue/android_native_app_glue.h>
 #include <android/keycodes.h>
 
@@ -318,10 +318,16 @@ int32_t handle_input(struct android_app* app, AInputEvent* event) {
  */
 void handle_cmd(struct android_app* app, int32_t cmd) {
   SFG_Window* window = fgWindowByHandle(app->window);  /* may be NULL */
+  JNIEnv* env = app->activity->env;
+  JavaVM* vm = app->activity->vm;
+
   switch (cmd) {
   /* App life cycle, in that order: */
   case APP_CMD_START:
     LOGI("handle_cmd: APP_CMD_START");
+
+    // Attach native thread from JVM
+    (*vm)->AttachCurrentThread(vm, &env, NULL);
     break;
   case APP_CMD_RESUME:
     LOGI("handle_cmd: APP_CMD_RESUME");
@@ -370,6 +376,9 @@ void handle_cmd(struct android_app* app, int32_t cmd) {
     break;
   case APP_CMD_DESTROY: /* Activity.onDestroy */
     LOGI("handle_cmd: APP_CMD_DESTROY");
+    // Detach native thread from JVM
+    (*vm)->DetachCurrentThread(vm);
+
     /* User closed the application for good, let's kill the window */
     {
       /* Can't use fgWindowByHandle as app->window is NULL */

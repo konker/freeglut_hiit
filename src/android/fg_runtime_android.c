@@ -51,8 +51,8 @@
 #include "android/native_app_glue/android_native_app_glue.h"
 #include "android/fg_main_android.h"
 
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "FreeGLUT-jnicb", __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "FreeGLUT-jnicb", __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "WOMBATT", __VA_ARGS__), __android_log_print(ANDROID_LOG_INFO, "WOMBATT", "\tgettid: %d", gettid()) )
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARN, "WOMBATT", __VA_ARGS__))
 
 /* Cf. fg_main_android.c */
 extern int32_t handle_input(struct android_app* app, AInputEvent* event);
@@ -138,7 +138,7 @@ static void extract_assets(struct android_app* app) {
  * event loop for receiving input events and doing other things.
  */
 void android_main(struct android_app* app) {
-  LOGI("android_main savedState=%p", app->savedState);
+  LOGI("---------------------------------------------- android_main savedState=%p", app->savedState);
 
   /* Register window resize callback */
   app->activity->callbacks->onNativeWindowResized = onNativeWindowResized;

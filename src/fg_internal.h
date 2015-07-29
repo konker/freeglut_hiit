@@ -894,6 +894,7 @@ extern SFG_State fgState;
 #define  FREEGLUT_EXIT_IF_NOT_INITIALISED( string )               \
   if ( ! fgState.Initialised )                                    \
   {                                                               \
+    fgWarning( string );                                          \
     fgError ( " ERROR:  Function <%s> called"                     \
               " without first calling 'glutInit'.", (string) ) ;  \
   }
@@ -901,6 +902,7 @@ extern SFG_State fgState;
 #define  FREEGLUT_INTERNAL_ERROR_EXIT_IF_NOT_INITIALISED( string )  \
   if ( ! fgState.Initialised )                                      \
   {                                                                 \
+    fgWarning( string );                                            \
     fgError ( " ERROR:  Internal <%s> function called"              \
               " without first calling 'glutInit'.", (string) ) ;    \
   }
@@ -908,6 +910,8 @@ extern SFG_State fgState;
 #define  FREEGLUT_INTERNAL_ERROR_EXIT( cond, string, function )  \
   if ( ! ( cond ) )                                              \
   {                                                              \
+    fgWarning( string );                                         \
+    fgWarning( function );                                       \
     fgError ( " ERROR:  Internal error <%s> in function %s",     \
               (string), (function) ) ;                           \
   }
@@ -931,7 +935,8 @@ extern SFG_State fgState;
   if ( ! fgStructure.CurrentWindow &&                                       \
        ( fgState.ActionOnWindowClose != GLUT_ACTION_CONTINUE_EXECUTION ) )  \
   {                                                                         \
-    fgError ( " ERROR:  Function <%s> called"                               \
+    fgWarning( (string) );                                                  \
+    fgError ( " ERROR:  Function <%s> called"                              \
               " with no current window defined.", (string) ) ;              \
   }
 

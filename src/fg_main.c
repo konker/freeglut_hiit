@@ -514,6 +514,8 @@ void FGAPIENTRY glutMainLoop( void )
         }
     }
 
+    fgWarning(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> [end of glutMainLoop]");
+
     /*
      * When this loop terminates, destroy the display, state and structure
      * of a freeglut session, so that another glutInit() call can happen
@@ -532,6 +534,7 @@ void FGAPIENTRY glutMainLoop( void )
 void FGAPIENTRY glutLeaveMainLoop( void )
 {
     FREEGLUT_EXIT_IF_NOT_INITIALISED ( "glutLeaveMainLoop" );
+
     fgState.ExecState = GLUT_EXEC_STATE_STOP ;
 }
 

@@ -25,9 +25,9 @@
 #include "android_native_app_glue.h"
 #include <android/log.h>
 
-#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "threaded_app", __VA_ARGS__))
-#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARNING, "threaded_app", __VA_ARGS__))
-#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUD, "threaded_app", __VA_ARGS__))
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO, "WOMBATT", __VA_ARGS__), __android_log_print(ANDROID_LOG_INFO, "WOMBATT", "\tgettid: %d", gettid()) )
+#define LOGW(...) ((void)__android_log_print(ANDROID_LOG_WARNING, "WOMBATT", __VA_ARGS__))
+#define LOGD(...) ((void)__android_log_print(ANDROID_LOG_DEBUD, "WOMBATT", __VA_ARGS__))
 
 static void free_saved_state(struct android_app* android_app) {
     pthread_mutex_lock(&android_app->mutex);
@@ -223,7 +223,7 @@ void app_dummy() {
 }
 
 static void android_app_destroy(struct android_app* android_app) {
-    LOGI("android_app_destroy!");
+    LOGI(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> [android_app_destroy]");
     free_saved_state(android_app);
     pthread_mutex_lock(&android_app->mutex);
     if (android_app->inputQueue != NULL) {
